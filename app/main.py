@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
 from .database import get_db, init_db
-from . import models
+from .models import Product
 from .logger import logger
 from .schemas import ProductCreate
 
@@ -16,7 +16,7 @@ def startup():
 def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     logger.info(f"Creating product: {product.name}, price: {product.price}, stock: {product.stock}")
     
-    new_product = models.Product(
+    new_product = Product(
         name=product.name,
         price=product.price,
         stock=product.stock
@@ -30,7 +30,7 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
 @app.get("/product/{product_id}")
 def get_product(product_id: int, db: Session = Depends(get_db)):
     logger.info(f"Fetching product with ID: {product_id}")
-    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         logger.warning(f"Product not found: ID {product_id}")
         raise HTTPException(status_code=404, detail="Product not found")
