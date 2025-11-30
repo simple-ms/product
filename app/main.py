@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException, Depends
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from .database import get_db, init_db
 from . import models
 from .logger import logger
+from .schemas import ProductCreate
 
 app = FastAPI()
 
@@ -11,11 +11,6 @@ app = FastAPI()
 def startup():
     init_db()
     logger.info("Product service started")
-
-class ProductCreate(BaseModel):
-    name: str
-    price: float
-    stock: int
 
 @app.post("/product")
 def create_product(product: ProductCreate, db: Session = Depends(get_db)):
