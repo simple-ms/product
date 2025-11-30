@@ -1,9 +1,12 @@
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from .database import get_db, init_db
 from .models import Product
 from .logger import logger
 from .schemas import ProductCreate
+
+security = HTTPBearer()
 
 app = FastAPI()
 
@@ -13,7 +16,11 @@ def startup():
     logger.info("Product service started")
 
 @app.post("/product")
-def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+def create_product(
+    product: ProductCreate,
+    db: Session = Depends(get_db),
+    token: HTTPBearer = Depends(security)
+):
     logger.info(f"Creating product: {product.name}, price: {product.price}, stock: {product.stock}")
     
     new_product = Product(
@@ -28,7 +35,11 @@ def create_product(product: ProductCreate, db: Session = Depends(get_db)):
     return {"message": "Product created successfully", "id": new_product.id}
 
 @app.get("/product/{product_id}")
-def get_product(product_id: int, db: Session = Depends(get_db)):
+def get_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    token: HTTPBearer = Depends(security)
+):
     logger.info(f"Fetching product with ID: {product_id}")
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
