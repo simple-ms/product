@@ -8,7 +8,11 @@ from .schemas import ProductCreate
 
 security = HTTPBearer()
 
-app = FastAPI()
+app = FastAPI(
+    docs_url="/docs/product",
+    openapi_url="/openapi.json/product",
+    redoc_url="/redoc/product"
+)
 
 @app.on_event("startup")
 def startup():
