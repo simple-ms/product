@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
-from .database import get_db, init_db
+from .database import get_db
 from .models import Product
 from .logger import logger
 from .schemas import ProductCreate
@@ -13,11 +13,6 @@ app = FastAPI(
     openapi_url="/openapi.json/product",
     redoc_url="/redoc/product"
 )
-
-@app.on_event("startup")
-def startup():
-    init_db()
-    logger.info("Product service started")
 
 @app.post("/product")
 def create_product(
