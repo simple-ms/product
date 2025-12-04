@@ -9,7 +9,7 @@ from sqlalchemy import select
 from .database import get_db
 from .models import Product
 from .logger import logger
-from .schemas import ProductCreate, ProductResponse
+from .schemas import ProductCreate, ProductResponse, ProductStockUpdate
 
 security = HTTPBearer()
 
@@ -25,7 +25,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080", "http://localhost"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,9 +35,27 @@ app.add_middleware(
 # --- HEALTH CHECK ---
 
 @app.get("/product/health", tags=["Health"])
-async def health_check():
-    """Health check endpoint for monitoring."""
-    return {"status": "healthy", "service": "product-service"}
+async def health_check(db: AsyncSession = Depends(get_db)):
+    """Health check endpoint with database connectivity check."""
+    try:
+        # Check database connectivity
+        await db.execute(select(1))
+        return {
+            "status": "healthy",
+            "service": "product-service",
+            "database": "connected"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "unhealthy",
+                "service": "product-service",
+                "database": "disconnected",
+                "error": str(e)
+            }
+        )
 
 
 # --- PRODUCT ENDPOINTS ---
@@ -137,6 +155,9 @@ async def get_all_products(
     
     Public endpoint - no authentication required.
     """
+    # Cap the limit to prevent abuse
+    limit = min(limit, 100)
+    
     logger.info(f"Fetching products: skip={skip}, limit={limit}")
     
     try:
@@ -199,6 +220,86 @@ async def update_product(
     except SQLAlchemyError as e:
         await db.rollback()
         logger.error(f"Database error while updating product: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error occurred"
+        )
+
+
+@app.patch(
+    "/product/{product_id}/stock",
+    response_model=ProductResponse,
+    tags=["Products"]
+)
+async def update_product_stock(
+    product_id: int,
+    stock_update: ProductStockUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update product stock (increment or decrement).
+    
+    This endpoint is used internally by the Order service to decrement stock
+    when an order is placed, or to increment stock when an order is cancelled.
+    
+    Args:
+        product_id: The product ID
+        stock_update: Contains quantity to add (positive) or remove (negative)
+    
+    Returns:
+        Updated product with new stock level
+    """
+    logger.info(f"Updating stock for product ID {product_id} by {stock_update.quantity}")
+    
+    try:
+        result = await db.execute(
+            select(Product)
+            .filter(Product.id == product_id)
+            .with_for_update()  # Lock the row to prevent race conditions
+        )
+        product = result.scalar_one_or_none()
+        
+        if not product:
+            logger.warning(f"Product not found: ID {product_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Product not found"
+            )
+        
+        new_stock = product.stock + stock_update.quantity
+        
+        if new_stock < 0:
+            logger.warning(
+                f"Insufficient stock for product {product_id}: "
+                f"current={product.stock}, change={stock_update.quantity}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error_code": "INSUFFICIENT_STOCK",
+                    "message": "Not enough stock available",
+                    "details": {
+                        "current_stock": product.stock,
+                        "requested_change": stock_update.quantity
+                    }
+                }
+            )
+        
+        product.stock = new_stock
+        await db.commit()
+        await db.refresh(product)
+        
+        logger.info(
+            f"Stock updated for product {product_id}: "
+            f"old={product.stock - stock_update.quantity}, new={product.stock}"
+        )
+        return product
+        
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        await db.rollback()
+        logger.error(f"Database error while updating product stock: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database error occurred"
