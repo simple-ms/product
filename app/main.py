@@ -1,6 +1,5 @@
 from typing import List
 from fastapi import FastAPI, HTTPException, Depends, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
@@ -10,7 +9,6 @@ from .database import get_db
 from .models import Product
 from .logger import logger
 from .schemas import ProductCreate, ProductResponse, ProductStockUpdate
-from .settings import cors_settings
 
 security = HTTPBearer()
 
@@ -23,14 +21,7 @@ app = FastAPI(
     redoc_url="/redoc/product"
 )
 
-# Add CORS middleware with configurable settings
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_settings.origins_list,
-    allow_credentials=cors_settings.CORS_ALLOW_CREDENTIALS,
-    allow_methods=[cors_settings.CORS_ALLOW_METHODS],
-    allow_headers=[cors_settings.CORS_ALLOW_HEADERS],
-)
+# NOTE: CORS is handled by nginx gateway - no CORS middleware here
 
 
 # --- HEALTH CHECK ---
