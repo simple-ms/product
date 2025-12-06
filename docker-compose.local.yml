@@ -9,14 +9,20 @@ services:
       - ./app:/app/app
     ports:
       - "8002:8000"
-    environment:
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@product-db:5432/product_db
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
     depends_on:
       - product-db
+    env_file:
+      - .env
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8000/product/health || exit 1" ]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
 
   product-db:
-    image: postgres:17-alpine
+    image: postgres:17
     container_name: product-db
     restart: always
     environment:
@@ -36,3 +42,4 @@ services:
 
 volumes:
   product-db-data:
+    name: product-db-data
