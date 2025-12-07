@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
+from uuid import UUID
 
 
 class ProductCreate(BaseModel):
@@ -44,6 +45,7 @@ class ProductResponse(BaseModel):
     name: str
     price: float
     stock: int
+    seller_id: UUID | None = None  # UUID of the seller who owns this product
     
     class Config:
         from_attributes = True
