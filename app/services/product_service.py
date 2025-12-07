@@ -6,6 +6,7 @@ from ..models.product import Product
 from ..schemas.product import ProductCreate, ProductStockUpdate, ProductResponse
 from ..repository import ProductRepository
 from ..logger import logger
+from ..kafka_producer import publish_product_created, publish_product_updated, publish_product_deleted
 
 
 class ProductService:
@@ -14,7 +15,11 @@ class ProductService:
     def __init__(self, product_repository: ProductRepository):
         self.product_repository = product_repository
     
-    async def create_product(self, product_data: ProductCreate, seller_id=None) -> Product:
+    async def create_product(
+        self, 
+        product_data: ProductCreate, 
+        seller_id=None
+    ) -> Product:
         """Create a new product."""
         logger.info(f"Creating product: {product_data.name}, price: {product_data.price}, stock: {product_data.stock}, seller: {seller_id}")
         
@@ -27,6 +32,16 @@ class ProductService:
             )
             product = await self.product_repository.create(new_product)
             logger.info(f"Product created successfully: ID {product.id}, name: {product_data.name}")
+            
+            # Publish product_created event to Kafka
+            publish_product_created({
+                "product_id": product.id,
+                "seller_id": product.seller_id,
+                "name": product.name,
+                "price": product.price,
+                "stock": product.stock
+            })
+            
             return product
         except SQLAlchemyError as e:
             await self.product_repository.rollback()
@@ -36,7 +51,10 @@ class ProductService:
                 detail="Database error occurred"
             )
     
-    async def get_product(self, product_id: int) -> Product:
+    async def get_product(
+        self, 
+        product_id: int
+    ) -> Product:
         """Get a product by ID."""
         logger.info(f"Fetching product with ID: {product_id}")
         
@@ -61,7 +79,11 @@ class ProductService:
                 detail="Database error occurred"
             )
     
-    async def get_all_products(self, skip: int = 0, limit: int = 100) -> List[Product]:
+    async def get_all_products(
+        self, 
+        skip: int = 0, 
+        limit: int = 100
+    ) -> List[Product]:
         """Get all products with pagination."""
         limit = min(limit, 100)  # Cap the limit
         
@@ -78,7 +100,12 @@ class ProductService:
                 detail="Database error occurred"
             )
     
-    async def update_product(self, product_id: int, product_data: ProductCreate, user_id=None) -> Product:
+    async def update_product(
+        self, 
+        product_id: int, 
+        product_data: ProductCreate, 
+        user_id=None
+    ) -> Product:
         """Update a product (only owner can update)."""
         logger.info(f"Updating product ID {product_id}")
         
@@ -106,6 +133,16 @@ class ProductService:
             
             updated_product = await self.product_repository.update(product)
             logger.info(f"Product updated successfully: ID {product_id}")
+            
+            # Publish product_updated event to Kafka
+            publish_product_updated({
+                "product_id": updated_product.id,
+                "seller_id": updated_product.seller_id,
+                "name": updated_product.name,
+                "price": updated_product.price,
+                "stock": updated_product.stock
+            })
+            
             return updated_product
         except HTTPException:
             raise
@@ -117,7 +154,11 @@ class ProductService:
                 detail="Database error occurred"
             )
     
-    async def update_stock(self, product_id: int, stock_update: ProductStockUpdate) -> Product:
+    async def update_stock(
+        self, 
+        product_id: int, 
+        stock_update: ProductStockUpdate
+    ) -> Product:
         """Update product stock (increment or decrement)."""
         logger.info(f"Updating stock for product ID {product_id} by {stock_update.quantity}")
         
@@ -169,7 +210,11 @@ class ProductService:
                 detail="Database error occurred"
             )
     
-    async def delete_product(self, product_id: int, user_id=None) -> Dict[str, str]:
+    async def delete_product(
+        self, 
+        product_id: int, 
+        user_id=None
+    ) -> Dict[str, str]:
         """Delete a product (only owner can delete)."""
         logger.info(f"Deleting product ID {product_id}")
         
@@ -190,6 +235,9 @@ class ProductService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You can only delete your own products"
                 )
+            
+            # Publish product_deleted event before deleting
+            publish_product_deleted(product.id, product.seller_id)
             
             await self.product_repository.delete(product)
             logger.info(f"Product deleted successfully: ID {product_id}")

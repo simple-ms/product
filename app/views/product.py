@@ -1,10 +1,10 @@
 from typing import List
+from uuid import UUID
 from fastapi import APIRouter, Depends, status
-from fastapi.security import HTTPBearer
 
 from ..schemas.product import ProductCreate, ProductStockUpdate, ProductResponse
 from ..services import ProductService
-from ..dependencies import get_product_service, security
+from ..dependencies import get_product_service, get_current_user_id, get_current_user_role
 
 router = APIRouter(tags=["Products"])
 
@@ -16,22 +16,24 @@ router = APIRouter(tags=["Products"])
 )
 async def create_product(
     product: ProductCreate,
-    token: HTTPBearer = Depends(security),
+    user_id: UUID = Depends(get_current_user_id),
+    user_role: str = Depends(get_current_user_role),
     product_service: ProductService = Depends(get_product_service)
 ):
     """
     Create a new product.
     
-    Requires authentication. Product will be linked to the creating user (seller).
+    Only sellers can create products. Buyers must create a seller account.
+    Product will be linked to the creating user (seller).
     """
-    # Extract user_id from token if available
-    from ..dependencies import get_current_user_id
-    try:
-        user_id = await get_current_user_id()
-        return await product_service.create_product(product, seller_id=user_id)
-    except:
-        # Fallback if user_id extraction fails
-        return await product_service.create_product(product)
+    # Validate user role - only sellers can create products
+    if user_role != "seller":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only sellers can create products. Please create a seller account."
+        )
+    
+    return await product_service.create_product(product, seller_id=user_id)
 
 
 @router.get(
@@ -74,20 +76,23 @@ async def get_all_products(
 async def update_product(
     product_id: int,
     product_update: ProductCreate,
-    token: HTTPBearer = Depends(security),
+    user_id: UUID = Depends(get_current_user_id),
+    user_role: str = Depends(get_current_user_role),
     product_service: ProductService = Depends(get_product_service)
 ):
     """
     Update a product.
     
-    Requires authentication. Only the product owner can update.
+    Only sellers can update products. Only the product owner can update their own products.
     """
-    from ..dependencies import get_current_user_id
-    try:
-        user_id = await get_current_user_id()
-        return await product_service.update_product(product_id, product_update, user_id=user_id)
-    except:
-        return await product_service.update_product(product_id, product_update)
+    # Validate user role - only sellers can update products
+    if user_role != "seller":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only sellers can update products."
+        )
+    
+    return await product_service.update_product(product_id, product_update, user_id=user_id)
 
 
 @router.patch(
@@ -121,20 +126,23 @@ async def update_product_stock(
 )
 async def delete_product(
     product_id: int,
-    token: HTTPBearer = Depends(security),
+    user_id: UUID = Depends(get_current_user_id),
+    user_role: str = Depends(get_current_user_role),
     product_service: ProductService = Depends(get_product_service)
 ):
     """
     Delete a product.
     
-    Requires authentication. Only the product owner can delete.
+    Only sellers can delete products. Only the product owner can delete their own products.
     """
-    from ..dependencies import get_current_user_id
-    try:
-        user_id = await get_current_user_id()
-        return await product_service.delete_product(product_id, user_id=user_id)
-    except:
-        return await product_service.delete_product(product_id)
+    # Validate user role - only sellers can delete products
+    if user_role != "seller":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only sellers can delete products."
+        )
+    
+    return await product_service.delete_product(product_id, user_id=user_id)
 
 
 @router.get(

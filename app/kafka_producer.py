@@ -3,14 +3,11 @@ Kafka producer for Product Service.
 Publishes stock reservation responses.
 """
 import json
-import logging
 from typing import Dict, Any, Optional
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
 from .settings import settings
-
-
-logger = logging.getLogger("product-service")
+from .logger import logger
 
 
 class KafkaProducerClient:
@@ -115,3 +112,56 @@ def publish_stock_reservation_failed(reservation_data: Dict[str, Any], reason: s
         key=reservation_data["correlation_id"]
     )
 
+
+
+# --- Product Lifecycle Events ---
+
+def publish_product_created(product_data: dict) -> bool:
+    """Publish product_created event when a new product is created."""
+    event = {
+        "event_type": "product_created",
+        "product_id": product_data["product_id"],
+        "seller_id": str(product_data["seller_id"]),
+        "name": product_data["name"],
+        "price": product_data["price"],
+        "stock": product_data["stock"]
+    }
+    logger.info(f"Publishing product_created event for product {product_data['product_id']}")
+    return kafka_producer.send_event(
+        topic="product-events",
+        event_data=event,
+        key=str(product_data["product_id"])
+    )
+
+
+def publish_product_updated(product_data: dict) -> bool:
+    """Publish product_updated event when a product is updated."""
+    event = {
+        "event_type": "product_updated",
+        "product_id": product_data["product_id"],
+        "seller_id": str(product_data["seller_id"]),
+        "name": product_data["name"],
+        "price": product_data["price"],
+        "stock": product_data["stock"]
+    }
+    logger.info(f"Publishing product_updated event for product {product_data['product_id']}")
+    return kafka_producer.send_event(
+        topic="product-events",
+        event_data=event,
+        key=str(product_data["product_id"])
+    )
+
+
+def publish_product_deleted(product_id: int, seller_id: str) -> bool:
+    """Publish product_deleted event when a product is deleted."""
+    event = {
+        "event_type": "product_deleted",
+        "product_id": product_id,
+        "seller_id": str(seller_id)
+    }
+    logger.info(f"Publishing product_deleted event for product {product_id}")
+    return kafka_producer.send_event(
+        topic="product-events",
+        event_data=event,
+        key=str(product_id)
+    )

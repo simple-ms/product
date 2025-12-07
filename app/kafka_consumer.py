@@ -3,7 +3,6 @@ Kafka consumer for Product Service.
 Listens for stock reservation requests from Order Service.
 """
 import json
-import logging
 from kafka import KafkaConsumer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,9 +11,7 @@ from sqlalchemy import create_engine
 from .settings import settings
 from .models import Product
 from .kafka_producer import publish_stock_reserved, publish_stock_reservation_failed
-
-
-logger = logging.getLogger("product-service")
+from .logger import logger
 
 
 # Synchronous database URL (for consumer)
