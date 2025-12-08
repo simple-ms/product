@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
 Kafka consumer runner for Product Service.
-This script starts the Kafka consumer to listen for stock reservation requests.
+This script starts the async Kafka consumer to listen for stock reservation requests.
 """
 
 import sys
 import signal
 import logging
-from app.kafka_consumer import start_stock_event_consumer
+import asyncio
+from app.kafka.consumer import start_stock_event_consumer
 
 # Setup logging
 logging.basicConfig(
@@ -28,12 +29,11 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    logger.info("Starting Product Service Kafka Consumer...")
+    logger.info("Starting Product Service Async Kafka Consumer...")
     logger.info("Listening for stock reservation requests...")
     
     try:
-        start_stock_event_consumer()
+        asyncio.run(start_stock_event_consumer())
     except Exception as e:
         logger.error(f"Consumer error: {str(e)}")
         sys.exit(1)
-

@@ -6,7 +6,7 @@ from ..models.product import Product
 from ..schemas.product import ProductCreate, ProductStockUpdate, ProductResponse
 from ..repository import ProductRepository
 from ..logger import logger
-from ..kafka_producer import publish_product_created, publish_product_updated, publish_product_deleted
+from ..kafka.producer import publish_product_created, publish_product_updated, publish_product_deleted
 
 
 class ProductService:
@@ -34,7 +34,7 @@ class ProductService:
             logger.info(f"Product created successfully: ID {product.id}, name: {product_data.name}")
             
             # Publish product_created event to Kafka
-            publish_product_created({
+            await publish_product_created({
                 "product_id": product.id,
                 "seller_id": product.seller_id,
                 "name": product.name,
@@ -135,7 +135,7 @@ class ProductService:
             logger.info(f"Product updated successfully: ID {product_id}")
             
             # Publish product_updated event to Kafka
-            publish_product_updated({
+            await publish_product_updated({
                 "product_id": updated_product.id,
                 "seller_id": updated_product.seller_id,
                 "name": updated_product.name,
@@ -237,7 +237,7 @@ class ProductService:
                 )
             
             # Publish product_deleted event before deleting
-            publish_product_deleted(product.id, product.seller_id)
+            await publish_product_deleted(product.id, product.seller_id)
             
             await self.product_repository.delete(product)
             logger.info(f"Product deleted successfully: ID {product_id}")
