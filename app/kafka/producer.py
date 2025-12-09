@@ -29,7 +29,7 @@ class AsyncKafkaProducerClient:
                 key_serializer=lambda k: k.encode('utf-8') if k else None,
                 acks='all',
                 enable_idempotence=True,
-                max_in_flight_requests_per_connection=1
+                api_version="2.5.0"
             )
             await self.producer.start()
             self._started = True
