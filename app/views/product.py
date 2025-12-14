@@ -146,6 +146,39 @@ async def delete_product(
 
 
 @router.get(
+    "/products/me",
+    response_model=List[ProductResponse]
+)
+async def get_my_products(
+    skip: int = 0,
+    limit: int = 100,
+    user_id: UUID = Depends(get_current_user_id),
+    user_role: str = Depends(get_current_user_role),
+    product_service: ProductService = Depends(get_product_service)
+):
+    """
+    Get all products owned by the current seller.
+    
+    Requires authentication. Only sellers can access this endpoint.
+    """
+    from fastapi import HTTPException
+    
+    # Validate user role - only sellers have products
+    if user_role != "seller":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only sellers can view their products."
+        )
+    
+    from ..dependencies import get_product_repository
+    
+    # Get repository and fetch seller products
+    async for repo in get_product_repository():
+        products = await repo.get_by_seller(user_id, skip, limit)
+        return products
+
+
+@router.get(
     "/products/seller/{seller_id}",
     response_model=List[ProductResponse]
 )
